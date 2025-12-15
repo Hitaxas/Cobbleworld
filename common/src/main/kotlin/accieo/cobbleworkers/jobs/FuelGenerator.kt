@@ -40,7 +40,6 @@ object FuelGenerator : Worker {
      */
     override fun shouldRun(pokemonEntity: PokemonEntity): Boolean {
         if (!config.fuelGeneratorsEnabled) return false
-
         return CobbleworkersTypeUtils.isAllowedByType(config.typeGeneratesFuel, pokemonEntity) || isDesignatedGenerator(pokemonEntity)
     }
 
@@ -54,7 +53,7 @@ object FuelGenerator : Worker {
     }
 
     /**
-     * Finds closest furnace nearby.
+     * Finds closest furnace that has items to smelt but no fuel.
      */
     private fun findClosestFurnace(world: World, origin: BlockPos): BlockPos? {
         val possibleTargets = CobbleworkersCacheManager.getTargets(origin, jobType)
@@ -63,8 +62,17 @@ object FuelGenerator : Worker {
         return possibleTargets
             .filter { pos ->
                 val state = world.getBlockState(pos)
+                val blockEntity = world.getBlockEntity(pos) as? AbstractFurnaceBlockEntity
+
+                // VALIDATION:
+                // 1. Is a furnace
+                // 2. Is not currently lit
+                // 3. Has an item in the input slot (Index 0)
+                // 4. Navigation isn't expired
                 blockValidator(world, pos)
                         && !state.get(AbstractFurnaceBlock.LIT)
+                        && blockEntity != null
+                        && !blockEntity.getStack(0).isEmpty
                         && !CobbleworkersNavigationUtils.isRecentlyExpired(pos, world)
             }
             .minByOrNull { it.getSquaredDistance(origin) }
@@ -75,15 +83,12 @@ object FuelGenerator : Worker {
      */
     private fun handleFuelGeneration(world: World, origin: BlockPos, pokemonEntity: PokemonEntity) {
         val pokemonId = pokemonEntity.pokemon.uuid
-        val closestFurnace = findClosestFurnace(world, origin) ?: return
-
         val now = world.time
         val lastTime = lastGenerationTime[pokemonId] ?: 0L
 
-        if (now - lastTime < cooldownTicks) {
-            return
-        }
+        if (now - lastTime < cooldownTicks) return
 
+        val closestFurnace = findClosestFurnace(world, origin) ?: return
         val currentTarget = CobbleworkersNavigationUtils.getTarget(pokemonId, world)
 
         if (currentTarget == null) {
@@ -98,8 +103,13 @@ object FuelGenerator : Worker {
         }
 
         if (CobbleworkersNavigationUtils.isPokemonAtPosition(pokemonEntity, closestFurnace)) {
-            addBurnTime(world, closestFurnace)
-            lastGenerationTime[pokemonId] = now
+            // Double check input stack right before consuming energy/cooldown
+            val blockEntity = world.getBlockEntity(closestFurnace) as? AbstractFurnaceBlockEntity
+            if (blockEntity != null && !blockEntity.getStack(0).isEmpty) {
+                addBurnTime(world, closestFurnace)
+                lastGenerationTime[pokemonId] = now
+            }
+
             CobbleworkersNavigationUtils.releaseTarget(pokemonId, world)
         }
     }
@@ -111,7 +121,7 @@ object FuelGenerator : Worker {
         val blockEntity = world.getBlockEntity(furnacePos)
         if (blockEntity is AbstractFurnaceBlockEntity) {
             val accessor = blockEntity as AbstractFurnaceBlockEntityAccessor
-            val addedBurnTime = (config.burnTimeSeconds * 20).coerceAtMost(20000) // Max. is lava bucket level
+            val addedBurnTime = (config.burnTimeSeconds * 20).coerceAtMost(20000)
             accessor.setBurnTime(addedBurnTime)
             accessor.setFuelTime(addedBurnTime)
             world.setBlockState(furnacePos, world.getBlockState(furnacePos).with(AbstractFurnaceBlock.LIT, true))
