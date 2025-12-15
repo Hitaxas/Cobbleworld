@@ -105,6 +105,7 @@ object CobbleworkersCropUtils {
         val id = Registries.BLOCK.getId(block)
         val path = id.path
 
+        // Hearty Grains: Reset to Age 5 and maintain both halves
         if (block == CobblemonBlocks.HEARTY_GRAINS && ageProp != null && blockState.contains(Properties.DOUBLE_BLOCK_HALF)) {
             val lowerState = blockState.with(ageProp, 5).with(Properties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.LOWER)
             val upperState = blockState.with(ageProp, 5).with(Properties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.UPPER)
@@ -127,7 +128,12 @@ object CobbleworkersCropUtils {
                 (path == FarmersDelightBlocks.TOMATOES || path in FarmersDelightBlocks.MUSHROOMS) && blockState.contains(AGE_3) -> blockState.with(AGE_3, 0)
                 ageProp != null -> {
                     val resetAge = when {
-                        block is SweetBerryBushBlock || block == CobblemonBlocks.GALARICA_NUT_BUSH || (isCroptopia(block) && path.contains("berry")) -> 1
+                        // Croptopia Berry Bushes: Only reduce by 1 stage
+                        isCroptopia(block) && path.contains("berry") -> {
+                            (blockState.get(ageProp) - 1).coerceAtLeast(0)
+                        }
+
+                        block is SweetBerryBushBlock || block == CobblemonBlocks.GALARICA_NUT_BUSH -> 1
                         block == CobblemonBlocks.REVIVAL_HERB -> RevivalHerbBlock.MIN_AGE
                         else -> 0
                     }
