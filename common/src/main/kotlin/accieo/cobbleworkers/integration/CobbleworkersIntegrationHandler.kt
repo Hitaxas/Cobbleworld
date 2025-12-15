@@ -13,33 +13,28 @@ import accieo.cobbleworkers.interfaces.ModIntegrationHelper
 import accieo.cobbleworkers.utilities.CobbleworkersCropUtils
 import accieo.cobbleworkers.utilities.CobbleworkersInventoryUtils
 import net.minecraft.block.Block
+import net.minecraft.block.CropBlock
 import net.minecraft.registry.Registries
+import net.minecraft.state.property.IntProperty
 import net.minecraft.util.Identifier
 
 class CobbleworkersIntegrationHandler(private val helper: ModIntegrationHelper) {
     private val FARMERS_DELIGHT = "farmersdelight"
     private val SOPHISTICATED_STORAGE = "sophisticatedstorage"
+    private val CROPTOPIA = "croptopia"
 
-    /**
-     * Runs all relevant functions to add integrations
-     */
     fun addIntegrations() {
         addFarmersDelight()
+        addCroptopia()
         addSophisticatedStorage()
     }
 
-    /**
-     * Fetches mod blocks from block registry
-     */
     private fun getModBlocks(modId: String, names: List<String>): Set<Block> {
         return names.mapNotNull { name ->
             Registries.BLOCK.getOrEmpty(Identifier.of(modId, name)).orElse(null)
         }.toSet()
     }
 
-    /**
-     * Adds integration for farmer's delight
-     */
     private fun addFarmersDelight() {
         if (!helper.isModLoaded(FARMERS_DELIGHT)) return
 
@@ -48,8 +43,27 @@ class CobbleworkersIntegrationHandler(private val helper: ModIntegrationHelper) 
             FarmersDelightBlocks.ALL.toList()
         )
 
+        // Ensure this function exists in CobbleworkersCropUtils
         CobbleworkersCropUtils.addCompatibility(farmersDelightCrops)
-        Cobbleworkers.LOGGER.info("Added integration for farmer's delight!")
+        Cobbleworkers.LOGGER.info("Added integration for Farmer's Delight!")
+    }
+
+    private fun addCroptopia() {
+        if (!helper.isModLoaded(CROPTOPIA)) return
+
+        val croptopiaBlocks = Registries.BLOCK.ids
+            .filter { it.namespace == CROPTOPIA }
+            .map { Registries.BLOCK.get(it) }
+            .filter { block ->
+                // Only add blocks that look like crops (is a CropBlock or has an 'age' property)
+                block is CropBlock || block.defaultState.properties.any { it is IntProperty && it.name == "age" }
+            }
+            .toSet()
+
+        if (croptopiaBlocks.isNotEmpty()) {
+            CobbleworkersCropUtils.addCompatibility(croptopiaBlocks)
+            Cobbleworkers.LOGGER.info("Added integration for Croptopia (${croptopiaBlocks.size} blocks)!")
+        }
     }
 
     /**
