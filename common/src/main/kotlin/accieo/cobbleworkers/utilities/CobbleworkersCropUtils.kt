@@ -13,12 +13,8 @@ import accieo.cobbleworkers.config.CobbleworkersConfig
 import accieo.cobbleworkers.enums.JobType
 import accieo.cobbleworkers.integration.FarmersDelightBlocks
 import accieo.cobbleworkers.integration.CroptopiaBlocks
-import accieo.cobbleworkers.jobs.CropHarvester
-import accieo.cobbleworkers.jobs.CropIrrigator
 import com.cobblemon.mod.common.CobblemonBlocks
 import com.cobblemon.mod.common.block.HeartyGrainsBlock
-import com.cobblemon.mod.common.block.MedicinalLeekBlock
-import com.cobblemon.mod.common.block.NutBushBlock
 import com.cobblemon.mod.common.block.RevivalHerbBlock
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
 import net.minecraft.block.*
@@ -28,10 +24,12 @@ import net.minecraft.loot.context.LootContextParameters
 import net.minecraft.registry.Registries
 import net.minecraft.server.world.ServerWorld
 import net.minecraft.state.property.IntProperty
+import net.minecraft.state.property.Properties
 import net.minecraft.state.property.Properties.AGE_3
 import net.minecraft.util.math.BlockPos
 import net.minecraft.world.World
 import java.util.UUID
+import net.minecraft.block.enums.DoubleBlockHalf
 
 /**
  * Utility functions for crop related stuff.
@@ -54,23 +52,14 @@ object CobbleworkersCropUtils {
         CobblemonBlocks.GALARICA_NUT_BUSH
     )
 
-    /**
-     * Adds compat for Farmers Delight and Croptopia crops
-     */
     fun addCompatibility(externalBlocks: Set<Block>) {
         validCropBlocks.addAll(externalBlocks)
     }
 
-    /**
-     * Detects if a block belongs to the Croptopia namespace.
-     */
     fun isCroptopia(block: Block): Boolean {
         return Registries.BLOCK.getId(block).namespace == "croptopia"
     }
 
-    /**
-     * Determines if a block is a valid harvest target for the worker.
-     */
     fun isHarvestable(state: BlockState): Boolean {
         val block = state.block
         return block in validCropBlocks || isCroptopia(block) || block is CropBlock
@@ -102,6 +91,11 @@ object CobbleworkersCropUtils {
 
         if (!isHarvestable(blockState)) return
 
+        if (blockState.contains(Properties.DOUBLE_BLOCK_HALF) &&
+            blockState.get(Properties.DOUBLE_BLOCK_HALF) == DoubleBlockHalf.UPPER) {
+            return
+        }
+
         val lootParams = LootContextParameterSet.Builder(world as ServerWorld)
             .add(LootContextParameters.ORIGIN, blockPos.toCenterPos())
             .add(LootContextParameters.BLOCK_STATE, blockState)
@@ -116,26 +110,21 @@ object CobbleworkersCropUtils {
         val id = Registries.BLOCK.getId(block)
         val path = id.path
 
-        // Handle multi-block Hearty Grains first
-        if (block == CobblemonBlocks.HEARTY_GRAINS) {
-            val belowPos = blockPos.down()
-            val belowState = world.getBlockState(belowPos)
-            world.setBlockState(belowPos, belowState.with(HeartyGrainsBlock.AGE, HeartyGrainsBlock.AGE_AFTER_HARVEST), Block.NOTIFY_LISTENERS)
-            world.setBlockState(blockPos, Blocks.AIR.defaultState, Block.NOTIFY_LISTENERS)
-            return
+        if (blockState.contains(Properties.DOUBLE_BLOCK_HALF)) {
+            val upperPos = blockPos.up()
+            if (world.getBlockState(upperPos).isOf(block)) {
+                world.setBlockState(upperPos, Blocks.AIR.defaultState, Block.NOTIFY_LISTENERS)
+            }
         }
 
         val newState = if (config.shouldReplantCrops) {
             val ageProp = getAgeProperty(blockState)
             when {
-                /** Farmer's Delight Special Logic **/
                 path == FarmersDelightBlocks.RICE_PANICLES -> Blocks.AIR.defaultState
                 (path == FarmersDelightBlocks.TOMATOES || path in FarmersDelightBlocks.MUSHROOMS) && blockState.contains(AGE_3) -> blockState.with(AGE_3, 0)
 
-                /** Croptopia & Modded age property reset **/
                 ageProp != null -> {
                     val resetAge = when {
-                        // Some Croptopia/Vanilla bushes reset to stage 1, not 0
                         block is SweetBerryBushBlock ||
                                 block == CobblemonBlocks.GALARICA_NUT_BUSH ||
                                 (isCroptopia(block) && path.contains("berry")) -> 1
@@ -145,14 +134,10 @@ object CobbleworkersCropUtils {
                     }
                     blockState.with(ageProp, resetAge)
                 }
-
-                /** Cave vines **/
                 block is CaveVines -> blockState.with(CaveVinesBodyBlock.BERRIES, false)
-
                 else -> Blocks.AIR.defaultState
             }
         } else {
-            // Replant disabled: Bushes still reset to stage 1 (to avoid broken textures), others become Air
             if (block is SweetBerryBushBlock || block == CobblemonBlocks.GALARICA_NUT_BUSH) {
                 blockState.with(AGE_3, 1)
             } else {
@@ -168,14 +153,12 @@ object CobbleworkersCropUtils {
         val block = state.block
         val path = Registries.BLOCK.getId(block).path
 
-        // Check for integer "age" property first (Generic mod support)
         val ageProp = getAgeProperty(state)
         if (ageProp != null) {
             val maxAge = ageProp.values.maxOrNull() ?: 0
             return state.get(ageProp) >= maxAge
         }
 
-        // Fallback for non-standard maturity indicators
         return when {
             block is HeartyGrainsBlock -> block.getAge(state) == HeartyGrainsBlock.MATURE_AGE
             block is CaveVines -> state.get(CaveVinesBodyBlock.BERRIES)
