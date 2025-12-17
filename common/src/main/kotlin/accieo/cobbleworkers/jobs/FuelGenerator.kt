@@ -19,6 +19,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
 import net.minecraft.block.AbstractFurnaceBlock
 import net.minecraft.block.BlockState
 import net.minecraft.block.entity.AbstractFurnaceBlockEntity
+import net.minecraft.nbt.NbtCompound
 import net.minecraft.registry.Registries
 import net.minecraft.server.world.ServerWorld
 import net.minecraft.sound.SoundCategory
@@ -38,6 +39,14 @@ object FuelGenerator : Worker {
     private const val SOUND_INTERVAL = 30L // Play fire sound every 1.5 seconds
 
     override val jobType: JobType = JobType.FuelGenerator
+
+    /**
+     * Public accessor to check if a Pokémon is currently tending a furnace.
+     * This is used by the WorkerDispatcher to prevent working Pokémon from sleeping.
+     */
+    fun isPokemonTending(pokemonUuid: UUID): Boolean {
+        return pokemonTendingFurnaces.containsKey(pokemonUuid)
+    }
 
     /**
      * Supports Vanilla Furnaces AND Cooking for Blockheads Oven.
@@ -235,6 +244,92 @@ object FuelGenerator : Worker {
         }
     }
 
+    private fun spawnFlamethrowerParticles(world: World, pokemonEntity: PokemonEntity, furnacePos: BlockPos) {
+        if (world !is ServerWorld) return
+
+        // Calculate head height - try multiple approaches
+        val headHeight = try {
+            // Try to get the eye height (most reliable for head position)
+            pokemonEntity.getEyeY() - pokemonEntity.y
+        } catch (e: Exception) {
+            try {
+                // Fallback: use standing eye height
+                pokemonEntity.standingEyeHeight.toDouble()
+            } catch (e2: Exception) {
+                // Last resort: 80% of total height
+                pokemonEntity.height * 0.8
+            }
+        }
+
+        val startX = pokemonEntity.x
+        val startY = pokemonEntity.y + headHeight
+        val startZ = pokemonEntity.z
+
+        val furnaceCenter = furnacePos.toCenterPos()
+        val endX = furnaceCenter.x
+        val endY = furnaceCenter.y - 0.5
+        val endZ = furnaceCenter.z
+
+        val dx = endX - startX
+        val dy = endY - startY
+        val dz = endZ - startZ
+        val distance = kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
+
+        val steps = (distance / 0.15).toInt()
+        for (i in 0..steps) {
+            val progress = i.toDouble() / steps
+            val x = startX + dx * progress
+            val y = startY + dy * progress
+            val z = startZ + dz * progress
+
+            val offsetX = (Math.random() - 0.5) * 0.05
+            val offsetY = (Math.random() - 0.5) * 0.05
+            val offsetZ = (Math.random() - 0.5) * 0.05
+
+            world.spawnParticles(
+                net.minecraft.particle.ParticleTypes.FLAME,
+                x + offsetX,
+                y + offsetY,
+                z + offsetZ,
+                1,
+                0.0,
+                0.0,
+                0.0,
+                0.00025
+            )
+
+            if (i % 4 == 0) {
+                world.spawnParticles(
+                    net.minecraft.particle.ParticleTypes.SMOKE,
+                    x + offsetX,
+                    y + offsetY,
+                    z + offsetZ,
+                    1,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.00025
+                )
+            }
+        }
+
+        world.spawnParticles(
+            net.minecraft.particle.ParticleTypes.FLAME,
+            endX,
+            endY,
+            endZ,
+            2,
+            0.05,
+            0.05,
+            0.05,
+            0.005
+        )
+    }
+
+    private fun isFurnaceBeingTended(pos: BlockPos): Boolean {
+        return pokemonTendingFurnaces.values.any { it == pos }
+    }
+
     private fun handleFuelGeneration(world: World, origin: BlockPos, pokemonEntity: PokemonEntity) {
         val pokemonId = pokemonEntity.pokemon.uuid
         val now = world.time
@@ -242,6 +337,8 @@ object FuelGenerator : Worker {
 
         // If pokemon is tending a furnace, check if it's still cooking
         if (tendingPos != null) {
+            forceStandPose(pokemonEntity)
+
             // Check if furnace still exists and is valid
             if (!blockValidator(world, tendingPos) || !isCooking(world, tendingPos)) {
                 // Cooking done or furnace removed, release
@@ -269,6 +366,10 @@ object FuelGenerator : Worker {
                 playFireSound(world, tendingPos)
                 lastSoundTime[pokemonId] = now
             }
+
+            // Spawn flamethrower particles every tick
+            spawnFlamethrowerParticles(world, pokemonEntity, tendingPos)
+
             return
         }
 
@@ -280,7 +381,11 @@ object FuelGenerator : Worker {
         val currentTarget = CobbleworkersNavigationUtils.getTarget(pokemonId, world)
 
         if (currentTarget == null) {
-            if (!CobbleworkersNavigationUtils.isTargeted(closestFurnace, world) && !CobbleworkersNavigationUtils.isRecentlyExpired(closestFurnace, world)) {
+            if (
+                !CobbleworkersNavigationUtils.isTargeted(closestFurnace, world) &&
+                !CobbleworkersNavigationUtils.isRecentlyExpired(closestFurnace, world) &&
+                !isFurnaceBeingTended(closestFurnace)
+            ) {
                 CobbleworkersNavigationUtils.claimTarget(pokemonId, closestFurnace, world)
             }
             return
@@ -296,7 +401,7 @@ object FuelGenerator : Worker {
                 lastGenerationTime[pokemonId] = now
 
                 // If furnace is now cooking, mark pokemon as tending it
-                if (isCooking(world, closestFurnace)) {
+                if (isCooking(world, closestFurnace) && !isFurnaceBeingTended(closestFurnace)) {
                     pokemonTendingFurnaces[pokemonId] = closestFurnace
                     lastSoundTime[pokemonId] = now
 
@@ -348,6 +453,15 @@ object FuelGenerator : Worker {
         // Stop all movement
         pokemonEntity.navigation.stop()
         pokemonEntity.setVelocity(0.0, pokemonEntity.velocity.y, 0.0)
+    }
+
+    /**
+     * Force Pokémon to remain standing while working.
+     */
+    private fun forceStandPose(pokemonEntity: PokemonEntity) {
+        val nbt = pokemonEntity.writeNbt(NbtCompound())
+        nbt.putString("PoseType", "STAND")
+        pokemonEntity.readNbt(nbt)
     }
 
     private fun addBurnTime(world: World, furnacePos: BlockPos) {
