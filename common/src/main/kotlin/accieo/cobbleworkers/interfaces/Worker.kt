@@ -35,4 +35,7 @@ interface Worker {
      * NOTE: Origin refers to the pasture's block position.
      */
     fun tick(world: World, origin: BlockPos, pokemonEntity: PokemonEntity)
+
+    fun interrupt(pokemonEntity: PokemonEntity, world: World) {
+    }
 }

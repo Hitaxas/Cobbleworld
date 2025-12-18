@@ -11,15 +11,14 @@ package accieo.cobbleworkers.jobs
 import accieo.cobbleworkers.enums.JobType
 import accieo.cobbleworkers.interfaces.Worker
 import accieo.cobbleworkers.utilities.DeferredBlockScanner
+import accieo.cobbleworkers.sanity.SanityManager
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
-import com.cobblemon.mod.common.entity.PoseType
-import java.util.UUID
 import net.minecraft.util.math.BlockPos
 import net.minecraft.world.World
-import kotlin.collections.filter
-import kotlin.collections.forEach
+import java.util.UUID
 
 object WorkerDispatcher {
+
     /**
      * Worker registry.
      */
@@ -72,9 +71,49 @@ object WorkerDispatcher {
      * Called ONCE per Pokémon in the pasture per tick.
      */
     fun tickPokemon(world: World, pastureOrigin: BlockPos, pokemonEntity: PokemonEntity) {
+
+        if (SanityManager.isRefusingWork(pokemonEntity)) {
+            handleRecovery(pokemonEntity)
+
+            if (SanityManager.canWork(pokemonEntity, world)) {
+            }
+            return
+        }
+
+        if (SanityManager.needsForcedBreak(pokemonEntity)) {
+            workers.forEach { it.interrupt(pokemonEntity, world) }
+            pokemonEntity.navigation.stop()
+            SanityManager.beginRefusal(pokemonEntity, world)
+            return
+        }
+
+        var didWork = false
+
         workers
             .filter { it.shouldRun(pokemonEntity) }
-            .forEach { it.tick(world, pastureOrigin, pokemonEntity) }
+            .forEach { worker ->
+                worker.tick(world, pastureOrigin, pokemonEntity)
+                didWork = true
+            }
+
+
+        if (didWork) {
+            SanityManager.drainWhileWorking(pokemonEntity)
+            SanityManager.shouldComplain(pokemonEntity, world)
+        } else {
+            handleRecovery(pokemonEntity)
+        }
+    }
+
+    private fun handleRecovery(pokemonEntity: PokemonEntity) {
+        // Accessing POSE_TYPE correctly for Cobblemon
+        val currentPose = pokemonEntity.dataTracker.get(PokemonEntity.POSE_TYPE)
+
+        if (currentPose == com.cobblemon.mod.common.entity.PoseType.SLEEP) {
+            SanityManager.recoverWhileSleeping(pokemonEntity)
+        } else {
+            SanityManager.recoverWhileIdle(pokemonEntity)
+        }
     }
 
     fun forceAwakeIfWorking(pokemonEntity: PokemonEntity) {
@@ -87,9 +126,8 @@ object WorkerDispatcher {
             }
         }
 
-        if (FuelGenerator.isPokemonTending(pokemonEntity.uuid)) {
+        if (isWorking) {
             pokemonEntity.wakeUp()
-            return
         }
     }
 }
