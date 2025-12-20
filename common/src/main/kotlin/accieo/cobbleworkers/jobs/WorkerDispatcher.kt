@@ -119,7 +119,9 @@ object WorkerDispatcher {
             }
 
 // ===== SANITY MANAGEMENT =====
-        val activelyWorking = workers.any { it.isActivelyWorking(pokemonEntity) }
+        val activelyWorking = workers
+            .filter { it.shouldRun(pokemonEntity) }
+            .any { it.isActivelyWorking(pokemonEntity) }
 
         if (activelyWorking) {
             SanityManager.drainWhileWorking(pokemonEntity)

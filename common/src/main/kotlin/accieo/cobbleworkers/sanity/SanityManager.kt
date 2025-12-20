@@ -30,6 +30,7 @@ object SanityManager {
     const val COMPLAINING_THRESHOLD = 50.0 // Below this: RNG chance to slack off
     const val REFUSE_THRESHOLD = 50.0
     const val RESUME_THRESHOLD = 60.0
+    private val sleepYaw: MutableMap<UUID, Float> = ConcurrentHashMap()
 
     // for some reason, values lower than 0.1 seem to not update/allow the HUD to show...
     private const val WORK_DRAIN_PER_TICK =  0.0104 // 0.000625 // around 0.0125/second
@@ -112,6 +113,7 @@ object SanityManager {
             // Still on break - apply appropriate recovery
             if (isSleeping[uuid] == true) {
                 forceSleepPose(pokemon)
+                lockSleepRotation(pokemon)
                 recoverWhileSleeping(pokemon)
             } else {
                 recoverWhileIdle(pokemon)
@@ -240,6 +242,11 @@ object SanityManager {
             pokemon.noClip = false
             pokemon.setNoGravity(false)
 
+            val uuid = pokemon.pokemon.uuid
+            if (!sleepYaw.containsKey(uuid)) {
+                sleepYaw[uuid] = pokemon.yaw
+            }
+
             pokemon.dataTracker.set(PokemonEntity.POSE_TYPE, PoseType.SLEEP)
 
         } catch (e: Exception) {
@@ -249,9 +256,9 @@ object SanityManager {
         }
     }
 
+
     private fun clearSleepPose(pokemon: PokemonEntity) {
         try {
-            // Reset to standing pose
             pokemon.dataTracker.set(PokemonEntity.POSE_TYPE, PoseType.STAND)
         } catch (_: Exception) {}
 
@@ -259,11 +266,20 @@ object SanityManager {
             pokemon.setPose(net.minecraft.entity.EntityPose.STANDING)
         } catch (_: Exception) {}
 
+        sleepYaw.remove(pokemon.pokemon.uuid)
         pokemon.wakeUp()
     }
 
 
+    private fun lockSleepRotation(pokemon: PokemonEntity) {
+        val uuid = pokemon.pokemon.uuid
+        val yaw = sleepYaw[uuid] ?: return
 
+        pokemon.yaw = yaw
+        pokemon.prevYaw = yaw
+        pokemon.headYaw = yaw
+        pokemon.bodyYaw = yaw
+    }
 
     /**
      * Debug/admin command to set sanity.

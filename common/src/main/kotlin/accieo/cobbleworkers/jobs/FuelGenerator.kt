@@ -455,6 +455,19 @@ object FuelGenerator : Worker {
 
     override fun isActivelyWorking(pokemonEntity: PokemonEntity): Boolean {
         val uuid = pokemonEntity.pokemon.uuid
-        return pokemonTendingFurnaces.containsKey(uuid)
+        val pos = pokemonTendingFurnaces[uuid] ?: return false
+
+        if (
+            !blockValidator(pokemonEntity.world, pos) ||
+            !isCooking(pokemonEntity.world, pos)
+        ) {
+            pokemonTendingFurnaces.remove(uuid)
+            lastSoundTime.remove(uuid)
+            return false
+        }
+
+        return true
     }
+
+
 }
