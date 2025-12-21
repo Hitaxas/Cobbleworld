@@ -81,22 +81,11 @@ object WorkerDispatcher {
 
         // ===== REFUSAL STATE (Below 50% sanity) =====
         if (SanityManager.isRefusingWork(pokemonEntity)) {
-            // Pokemon is on break - just recover sanity
-            handleRecovery(pokemonEntity)
-
-            if (pokemonEntity.owner is ServerPlayerEntity) {
-                SanityHudSyncServer.sendUpdate(pokemonEntity.owner as ServerPlayerEntity)
-            }
-
-            // Check if ready to work again (handled internally by SanityManager.canWork)
-            if (SanityManager.canWork(pokemonEntity, world)) {
-                // canWork() already sent the "ready to work" message
-            }
+            SanityManager.canWork(pokemonEntity, world)
             return
         }
 
         // ===== FORCED BREAK CHECK =====
-        // If sanity just dropped below threshold, interrupt current work and begin refusal
         if (SanityManager.needsForcedBreak(pokemonEntity)) {
             workers.forEach { it.interrupt(pokemonEntity, world) }
             pokemonEntity.navigation.stop()
@@ -105,23 +94,23 @@ object WorkerDispatcher {
         }
 
         // ===== RANDOM SLACK-OFF CHECK (50-30% sanity) =====
-        // RNG chance to slack off this tick instead of working
         if (SanityManager.shouldSlackOff(pokemonEntity)) {
             handleRecovery(pokemonEntity)
             return
         }
 
-// ===== WORK PHASE =====
-        workers
-            .filter { it.shouldRun(pokemonEntity) }
-            .forEach { worker ->
-                worker.tick(world, pastureOrigin, pokemonEntity)
-            }
+        // ===== WORK PHASE =====
+        val eligibleWorkers = workers.filter { it.shouldRun(pokemonEntity) }
 
-// ===== SANITY MANAGEMENT =====
+        eligibleWorkers.forEach { worker ->
+            worker.tick(world, pastureOrigin, pokemonEntity)
+        }
+
+        // ===== SANITY MANAGEMENT =====
         val activelyWorking = workers
             .filter { it.shouldRun(pokemonEntity) }
             .any { it.isActivelyWorking(pokemonEntity) }
+
 
         if (activelyWorking) {
             SanityManager.drainWhileWorking(pokemonEntity)

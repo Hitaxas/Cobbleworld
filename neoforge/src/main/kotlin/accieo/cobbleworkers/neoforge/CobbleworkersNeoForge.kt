@@ -10,49 +10,60 @@ package accieo.cobbleworkers.neoforge
 
 import accieo.cobbleworkers.Cobbleworkers
 import accieo.cobbleworkers.integration.CobbleworkersIntegrationHandler
-import accieo.cobbleworkers.neoforge.client.config.CobbleworkersModListScreen
 import accieo.cobbleworkers.neoforge.integration.NeoForgeIntegrationHelper
-import net.minecraft.client.MinecraftClient
-import net.neoforged.fml.common.EventBusSubscriber
+import accieo.cobbleworkers.sanity.SanityPlatformNetworkingInstance
+import accieo.cobbleworkers.sanity.NeoForgeSanityNetworking
+import accieo.cobbleworkers.sanity.SanitySyncPayload
+import accieo.cobbleworkers.sanity.SanityHudClientState
+import accieo.cobbleworkers.sanity.SanitySyncTicker
 import net.neoforged.fml.common.Mod
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent
-import thedarkcolour.kotlinforforge.neoforge.forge.MOD_BUS
-import thedarkcolour.kotlinforforge.neoforge.forge.runForDist
-import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent
-import net.neoforged.fml.event.lifecycle.FMLDedicatedServerSetupEvent
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
+import net.neoforged.neoforge.network.handling.IPayloadContext
+import net.neoforged.neoforge.event.tick.LevelTickEvent
+import net.neoforged.bus.api.SubscribeEvent
+import net.neoforged.fml.common.EventBusSubscriber
+import net.minecraft.server.world.ServerWorld
+import thedarkcolour.kotlinforforge.neoforge.forge.MOD_BUS
 
-/**
- * NeoForge entrypoint.
- */
 @Mod(Cobbleworkers.MODID)
-@EventBusSubscriber(bus = EventBusSubscriber.Bus.MOD)
 object CobbleworkersNeoForge {
     init {
+        SanityPlatformNetworkingInstance = NeoForgeSanityNetworking
+
         Cobbleworkers.init()
 
-        val obj = runForDist(
-            clientTarget = {
-                MOD_BUS.addListener(::onClientSetup)
-                MinecraftClient.getInstance()
-            },
-            serverTarget = {
-                MOD_BUS.addListener(::onServerSetup)
-            }
-        )
+        MOD_BUS.addListener(::onCommonSetup)
+        MOD_BUS.addListener(::onRegisterPayloads)
     }
 
-    private fun onClientSetup(event: FMLClientSetupEvent) {
-        CobbleworkersModListScreen.registerModScreen()
-    }
-
-    private fun onServerSetup(event: FMLDedicatedServerSetupEvent) {
-        //
-    }
-
-    @SubscribeEvent
-    fun onCommonSetup(event: FMLCommonSetupEvent) {
+    private fun onCommonSetup(event: FMLCommonSetupEvent) {
         val integrationHandler = CobbleworkersIntegrationHandler(NeoForgeIntegrationHelper)
         integrationHandler.addIntegrations()
+    }
+
+    private fun onRegisterPayloads(event: RegisterPayloadHandlersEvent) {
+        val registrar = event.registrar("1.0.0")
+
+        registrar.playToClient(
+            SanitySyncPayload.ID,
+            SanitySyncPayload.CODEC
+        ) { payload: SanitySyncPayload, context: IPayloadContext ->
+            context.enqueueWork {
+                SanityHudClientState.update(payload.entries)
+            }
+        }
+    }
+}
+
+@EventBusSubscriber(bus = EventBusSubscriber.Bus.GAME)
+object SanityTickHandler {
+
+    @SubscribeEvent
+    fun onServerTick(event: LevelTickEvent.Post) {
+        val world = event.level
+        if (world is ServerWorld && !world.isClient) {
+            SanitySyncTicker.tick(world)
+        }
     }
 }
