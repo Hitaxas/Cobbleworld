@@ -46,6 +46,8 @@ object PartyWorkerCore {
 
         // 🚨 NEW: force release from any job
         WorkerDispatcher.releasePokemonFromJobs(pokemon)
+
+        accieo.cobbleworkers.sanity.SanityManager.recoverWhileIdle(pokemon)
     }
 
 

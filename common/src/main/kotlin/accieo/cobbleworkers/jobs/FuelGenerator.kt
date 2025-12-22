@@ -79,10 +79,36 @@ object FuelGenerator : Worker {
         if (tendingPos != null) {
             forceStandPose(pokemonEntity)
 
-            if (!blockValidator(world, tendingPos) || !isCooking(world, tendingPos)) {
+            if (!blockValidator(world, tendingPos)) {
                 interruptWork(pokemonEntity, world)
                 return
             }
+
+            if (!isCooking(world, tendingPos)) {
+                // Furnace stopped because fuel ran out
+                if (hasItemsToSmelt(world, tendingPos) && needsFuel(world, tendingPos)) {
+
+                    // Bypass cooldown for continuous tending
+                    addBurnTime(world, tendingPos)
+                    lastGenerationTime[pokemonId] = now
+
+                    // If it successfully lit, stay tending
+                    if (isCooking(world, tendingPos)) {
+                        lastSoundTime[pokemonId] = now
+                        playFireSound(world, tendingPos)
+                    } else {
+                        // Couldn't restart for some reason — bail out cleanly
+                        interruptWork(pokemonEntity, world)
+                    }
+
+                    return
+                }
+
+                // Nothing left to smelt → stop tending normally
+                interruptWork(pokemonEntity, world)
+                return
+            }
+
 
             pokemonEntity.navigation.stop()
 

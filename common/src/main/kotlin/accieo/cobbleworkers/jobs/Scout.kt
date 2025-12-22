@@ -8,6 +8,7 @@
 
 package accieo.cobbleworkers.jobs
 
+import accieo.cobbleworkers.Cobbleworkers
 import accieo.cobbleworkers.cache.CobbleworkersCacheManager
 import accieo.cobbleworkers.config.CobbleworkersConfigHolder
 import accieo.cobbleworkers.enums.JobType
@@ -46,12 +47,17 @@ object Scout : Worker {
     private val searchRadius get() = generalConfig.searchRadius
     private val searchHeight get() = generalConfig.searchHeight
     private val lastGenerationTime = mutableMapOf<UUID, Long>()
+    private val failedStructureLookups = mutableMapOf<Identifier, Long>()
+    private const val FAILED_RETRY_TICKS = 20L * 60L // retry after 60s
+
+    private val LOGGER = org.apache.logging.log4j.LogManager.getLogger("Cobbleworkers-Scout")
 
     override val jobType: JobType = JobType.Scout
     override val blockValidator: ((World, BlockPos) -> Boolean)? = null
 
+
     /**
-     * Determines if Pokémon is eligible to be a healer.
+     * Determines if Pokémon is eligible to be a scout.
      * NOTE: This is used to prevent running the tick method unnecessarily.
      */
     override fun shouldRun(pokemonEntity: PokemonEntity): Boolean {
@@ -105,27 +111,40 @@ object Scout : Worker {
     private fun createStructureMap(world: ServerWorld, origin: BlockPos): ItemStack? {
         val now = world.time
         val structures = CobbleworkersCacheManager.getStructures(world, config.useAllStructures, config.structureTags)
-        if (structures.isEmpty()) return null
 
-        val selectedId = structures.random()
-        val cached = CobbleworkersCacheManager.getCachedStructure(selectedId, now)
-        val searchResult = cached ?: locateStructure(world, selectedId, origin)?.also {
-            CobbleworkersCacheManager.cacheStructure(selectedId, it, now)
+        if (structures.isEmpty()) {
+            LOGGER.warn("[Cobbleworkers][Scout] No structure types available for scouting.")
+            return null
         }
 
-        if (searchResult == null) return null
+        val selectedId = structures.random()
+
+        // Negative cache check
+        failedStructureLookups[selectedId]?.let { lastFail ->
+            if (now - lastFail < FAILED_RETRY_TICKS) {
+                LOGGER.debug("[Cobbleworkers][Scout] Skipping $selectedId lookup (cooldown active)")
+                return null
+            }
+        }
+
+        // Positive cache
+        val cached = CobbleworkersCacheManager.getCachedStructure(selectedId, now)
+
+        val searchResult = cached ?: locateStructure(world, selectedId, origin)?.also {
+            CobbleworkersCacheManager.cacheStructure(selectedId, it, now)
+            LOGGER.info("[Cobbleworkers][Scout] Found $selectedId at ${it.first}")
+        }
+
+        if (searchResult == null) {
+            failedStructureLookups[selectedId] = now
+            LOGGER.info("[Cobbleworkers][Scout] No $selectedId nearby. Will retry later.")
+            return null
+        }
 
         val structurePos = searchResult.first
         val structureEntry = searchResult.second
 
-        val map = FilledMapItem.createMap(
-            world,
-            structurePos.x,
-            structurePos.z,
-            2.toByte(),
-            true,
-            true
-        )
+        val map = FilledMapItem.createMap(world, structurePos.x, structurePos.z, 2.toByte(), true, true)
 
         MapState.addDecorationsNbt(
             map,
@@ -134,34 +153,53 @@ object Scout : Worker {
             MapDecorationTypes.RED_X
         )
 
-        val mapKey = if (config.mapNameIsHidden) {
-            Text.of("Scout's map")
+        val name = if (config.mapNameIsHidden) {
+            Text.of("Scout's Map")
         } else {
             Text.of(cleanMapName(structureEntry.idAsString))
         }
 
-        map.set(DataComponentTypes.CUSTOM_NAME, mapKey)
+        map.set(DataComponentTypes.CUSTOM_NAME, name)
         map.set(DataComponentTypes.MAP_COLOR, MapColorComponent(0xCC84ED))
 
         return map
     }
 
-    private fun locateStructure(world: ServerWorld, structure: Identifier, pos: BlockPos): com.mojang.datafixers.util.Pair<BlockPos, RegistryEntry<Structure>>? {
+
+    private fun locateStructure(
+        world: ServerWorld,
+        structure: Identifier,
+        pos: BlockPos
+    ): com.mojang.datafixers.util.Pair<BlockPos, RegistryEntry<Structure>>? {
+
         val structureRegistry = world.server.registryManager.get(RegistryKeys.STRUCTURE)
 
         val entry = structureRegistry
             .getEntry(RegistryKey.of(RegistryKeys.STRUCTURE, structure))
-            .orElse(null) ?: return null
+            .orElse(null)
+
+        if (entry == null) {
+            LOGGER.error("[Cobbleworkers][Scout] Structure registry missing: $structure")
+            return null
+        }
 
         val entryList = RegistryEntryList.of(entry)
 
-        val chunkGenerator = world.chunkManager.chunkGenerator
-        return chunkGenerator.locateStructure(world, entryList, pos, 100, false)
+        LOGGER.debug("[Cobbleworkers][Scout] Searching for $structure near $pos...")
+
+        return world.chunkManager.chunkGenerator.locateStructure(
+            world,
+            entryList,
+            pos,
+            100,
+            false
+        ) ?: run {
+            LOGGER.debug("[Cobbleworkers][Scout] Structure not found: $structure")
+            null
+        }
     }
 
-    /**
-     * Handles logic for finding and gathering an item on the ground.
-     */
+
     private fun handleGathering(world: World, origin: BlockPos, pokemonEntity: PokemonEntity) {
         val pokemonId = pokemonEntity.pokemon.uuid
         val (closestItemPos, closestItem) = findClosestItem(world, origin) ?: return
@@ -224,5 +262,29 @@ object Scout : Worker {
             .replace("_", " ")
             .split(" ")
             .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+    }
+
+    override fun isActivelyWorking(pokemon: PokemonEntity): Boolean {
+        val id = pokemon.pokemon.uuid
+
+        if (heldItemsByPokemon.containsKey(id)) return true
+        if (CobbleworkersNavigationUtils.getTarget(id, pokemon.world) != null) return true
+
+        return false
+    }
+
+    override fun interrupt(pokemon: PokemonEntity, world: World) {
+        val id = pokemon.pokemon.uuid
+
+        // Drop any “currently collected” items
+        heldItemsByPokemon.remove(id)
+
+        // Clear failed deposit memory
+        failedDepositLocations.remove(id)
+
+        // Release navigation target
+        CobbleworkersNavigationUtils.releaseTarget(id, world)
+
+        LOGGER.debug("[Cobbleworkers][Scout] Interrupted and reset state for $id")
     }
 }
