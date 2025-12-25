@@ -8,7 +8,6 @@
 
 package accieo.cobbleworkers.sanity
 
-import net.minecraft.client.MinecraftClient
 import java.util.UUID
 
 object SanityHudClientState {
@@ -16,7 +15,7 @@ object SanityHudClientState {
     private data class SanityData(
         val entry: SanityEntry,
         val lastUpdateTime: Long,
-        var displaySanity: Float // Interpolated value for smooth display
+        var displaySanity: Double
     )
 
     private val sanityMap: MutableMap<UUID, SanityData> = mutableMapOf()
@@ -27,27 +26,24 @@ object SanityHudClientState {
     fun update(entries: List<SanityEntry>) {
         val currentTime = System.currentTimeMillis()
 
-        // Update or add new entries
         entries.forEach { entry ->
             val existing = sanityMap[entry.uuid]
             if (existing != null) {
-                // Keep the current display value for interpolation
+
                 sanityMap[entry.uuid] = SanityData(
                     entry = entry,
                     lastUpdateTime = currentTime,
                     displaySanity = existing.displaySanity
                 )
             } else {
-                // New entry - start at current value
                 sanityMap[entry.uuid] = SanityData(
                     entry = entry,
                     lastUpdateTime = currentTime,
-                    displaySanity = entry.sanity.toFloat()
+                    displaySanity = entry.sanity.toDouble() // This must be a Double
                 )
             }
         }
 
-        // Remove entries that are no longer sent
         val currentUUIDs = entries.map { it.uuid }.toSet()
         sanityMap.keys.retainAll(currentUUIDs)
 
@@ -55,24 +51,19 @@ object SanityHudClientState {
     }
 
     fun tick() {
-        val currentTime = System.currentTimeMillis()
+        sanityMap.forEach { (_, data) ->
+            val target = data.entry.sanity.toDouble()
+            val current = data.displaySanity
 
-        sanityMap.forEach { (uuid, data) ->
-            val targetSanity = data.entry.sanity.toFloat()
-            val timeSinceUpdate = (currentTime - data.lastUpdateTime) / 1000f
+            val lerpSpeed = 0.1
+            data.displaySanity = current + (target - current) * lerpSpeed
 
-            // Interpolate towards target value
-            val interpolationSpeed = 2.0f
-            val delta = (targetSanity - data.displaySanity) * interpolationSpeed * 0.016f // Assuming ~60fps
-
-            data.displaySanity += delta
-
-            // Clamp to avoid overshooting
-            data.displaySanity = data.displaySanity.coerceIn(0f, 100f)
+            if (data.displaySanity < 0.0) data.displaySanity = 0.0
+            if (data.displaySanity > 100.0) data.displaySanity = 100.0
         }
     }
 
-    fun getDisplaySanity(uuid: UUID): Int {
-        return sanityMap[uuid]?.displaySanity?.toInt() ?: 0
+    fun getDisplaySanity(uuid: UUID): Double {
+        return sanityMap[uuid]?.displaySanity ?: 0.0
     }
 }

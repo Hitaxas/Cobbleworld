@@ -297,13 +297,13 @@ object SanityManager {
         val sleeping = isSleeping[pokemon.pokemon.uuid] == true
 
         return when {
-            refusing && sleeping -> "Sleeping (${currentSanity.toInt()}%)"
-            refusing -> "Slacking Off (${currentSanity.toInt()}%)"
-            currentSanity < REFUSE_THRESHOLD -> "About to Slack (${currentSanity.toInt()}%)"
-            currentSanity < COMPLAINING_THRESHOLD -> "Unhappy (${currentSanity.toInt()}%)"
-            currentSanity >= 80 -> "Excellent (${currentSanity.toInt()}%)"
-            currentSanity >= 60 -> "Good (${currentSanity.toInt()}%)"
-            else -> "Fair (${currentSanity.toInt()}%)"
+            refusing && sleeping -> "Is fast asleep... (${currentSanity.toInt()}%)"
+            refusing -> "Is slacking off! (${currentSanity.toInt()}%)"
+            currentSanity < REFUSE_THRESHOLD -> "has just about had it... (${currentSanity.toInt()}%)"
+            currentSanity < COMPLAINING_THRESHOLD -> "Unhappy with work conditions. (${currentSanity.toInt()}%)"
+            currentSanity >= 80 -> "Is hard at work. (${currentSanity.toInt()}%)"
+            currentSanity >= 60 -> "Is in good condition. (${currentSanity.toInt()}%)"
+            else -> "Is getting a bit tired... (${currentSanity.toInt()}%)"
         }
     }
 
