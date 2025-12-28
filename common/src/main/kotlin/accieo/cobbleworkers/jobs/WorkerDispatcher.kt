@@ -15,11 +15,13 @@ import accieo.cobbleworkers.sanity.SanityManager
 import accieo.cobbleworkers.sanity.SanityHudSyncServer
 import accieo.cobbleworkers.sanity.SanityStorage
 import accieo.cobbleworkers.pokebed.PokeBedManager
+import com.cobblemon.mod.common.api.storage.party.PlayerPartyStore
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
 import net.minecraft.util.math.BlockPos
 import net.minecraft.world.World
 import java.util.UUID
 import net.minecraft.server.network.ServerPlayerEntity
+
 
 object WorkerDispatcher {
 
@@ -111,14 +113,21 @@ object WorkerDispatcher {
         }
 
         // === NIGHT TIME BED SEEKING ===
-        if (SanityManager.shouldUseBed(pokemonEntity, world)) {
+
+        val pData = pokemonEntity.pokemon
+        val uuid = pData.uuid
+
+        val currentStore = pData.storeCoordinates.get()?.store
+        val isPartyPokemon = currentStore is PlayerPartyStore
+
+        if (!isPartyPokemon && SanityManager.shouldUseBed(pokemonEntity, world)) {
             workers.forEach { it.interrupt(pokemonEntity, world) }
             pokemonEntity.navigation.stop()
 
-            val bedPos = PokeBedManager.findNearestBed(world, pokemonEntity.blockPos, pokemonEntity.pokemon.uuid)
-            if (bedPos != null && PokeBedManager.claimBed(pokemonEntity.pokemon.uuid, bedPos, world)) {
+            val bedPos = PokeBedManager.findNearestBed(world, pokemonEntity.blockPos, uuid)
+            if (bedPos != null && PokeBedManager.claimBed(uuid, bedPos, world)) {
                 SanityManager.forceSleepPose(pokemonEntity)
-                // Will navigate to bed on next tick
+                // Will navigate to bed next tick
             }
             return
         }

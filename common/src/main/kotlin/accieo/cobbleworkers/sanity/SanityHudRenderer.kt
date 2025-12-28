@@ -15,6 +15,7 @@ import net.minecraft.client.gui.DrawContext
 import net.minecraft.text.Text
 import net.minecraft.util.Formatting
 import net.minecraft.util.math.MathHelper
+import kotlin.math.roundToInt
 
 object SanityHudRenderer {
 
@@ -116,7 +117,8 @@ object SanityHudRenderer {
         val barMaxW = width - 38
 
         context.fill(barX, barY, barX + barMaxW, barY + BAR_HEIGHT, 0x44000000.toInt())
-        val fillW = (barMaxW.toDouble() * (displaySanity / 100.0)).toInt()
+        val sanityRatio = MathHelper.clamp(displaySanity / 100.0, 0.0, 1.0)
+        val fillW = MathHelper.clamp((barMaxW * sanityRatio).roundToInt(), 0, barMaxW)
 
         var finalBarColor = (0xFF shl 24) or barColor
         if (displaySanity < 30.0 && (mc.world?.time ?: 0) % 20 < 10) {

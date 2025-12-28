@@ -15,6 +15,8 @@ import com.cobblemon.mod.common.pokemon.Pokemon
 import com.cobblemon.mod.common.util.cobblemonResource
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.text.Text
+import net.minecraft.util.math.MathHelper
+import kotlin.math.roundToInt
 
 /**
  * Feature renderer that displays Pokemon sanity on the stats/other screen.
@@ -38,20 +40,21 @@ class SanityFeatureRenderer(
     }
 
     override fun renderBar(context: DrawContext, x: Float, y: Float, barValue: Int, barRatio: Float, barWidth: Int) {
-        val currentSanity = barValue
+        val currentSanity = barValue.coerceIn(0, 100)
 
         val (red, green, blue) = when {
-            currentSanity >= 70 -> Triple(0.27, 1.0, 0.47)    // Green
-            currentSanity >= 50 -> Triple(1.0, 0.87, 0.2)     // Yellow
-            currentSanity >= 30 -> Triple(1.0, 0.53, 0.2)     // Orange
-            else -> Triple(1.0, 0.27, 0.27)                   // Red
+            currentSanity >= 70 -> Triple(0.27, 1.0, 0.47)
+            currentSanity >= 50 -> Triple(1.0, 0.87, 0.2)
+            currentSanity >= 30 -> Triple(1.0, 0.53, 0.2)
+            else -> Triple(1.0, 0.27, 0.27)
         }
 
         val barStartOffset = 3
+        val trackWidth = 110
 
-        val trackWidth = 84
-
-        val fillWidth = (trackWidth.toDouble() * (currentSanity.toDouble() / 100.0)).toInt()
+        // **REAL LINEAR RATIO — no Cobblemon scaling**
+        val ratio = currentSanity / 100.0
+        val fillWidth = (trackWidth * ratio).roundToInt()
 
         blitk(
             matrixStack = context.matrices,

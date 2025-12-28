@@ -21,7 +21,6 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.random.Random
 import com.cobblemon.mod.common.api.storage.party.PlayerPartyStore
-import com.cobblemon.mod.common.api.storage.party.PartyStore
 
 object SanityManager {
 
@@ -217,17 +216,29 @@ object SanityManager {
         breakStartTime[uuid] = world.time
 
         val name = pokemon.pokemon.getDisplayName().string
-        val willSleep = Random.nextDouble() < SLEEP_CHANCE
 
+        // === PARTY CHECK ===
+        val store = pokemon.pokemon.storeCoordinates.get()?.store
+        val isPartyPokemon = store is PlayerPartyStore
+
+        // Party Pokémon NEVER sleep or seek beds
+        if (isPartyPokemon) {
+            isSleeping[uuid] = false
+            sendActionBar(pokemon, "$name is slacking off!", Formatting.RED)
+            return
+        }
+
+        // === NORMAL PASTURE LOGIC ===
+        val willSleep = Random.nextDouble() < SLEEP_CHANCE
         isSleeping[uuid] = willSleep
 
         if (willSleep) {
-            // Try to find and claim a bed
             val bedPos = PokeBedManager.findNearestBed(world, pokemon.blockPos, uuid)
+
             if (bedPos != null && PokeBedManager.claimBed(uuid, bedPos, world)) {
                 sendActionBar(pokemon, "$name is looking for a place to sleep...", Formatting.GOLD)
             } else {
-                // No bed available, sleep on the ground
+                // No bed available → sleep on ground
                 forceSleepPose(pokemon)
                 sendActionBar(pokemon, "$name is fast asleep!", Formatting.GOLD)
             }
