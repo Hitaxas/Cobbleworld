@@ -10,7 +10,7 @@
 
 Cobbleworkers is a companion server-side mod for Cobblemon that turns the **Pasture Block** into a powerful utility block.
 
-**This unofficial version aims to make the mod function more like Palworld, adding the sanity mechanic, beds for pokemon to sleep in, and more.
+**This unofficial version aims to make the mod function more like Palworld, adding the sanity mechanic, beds for pokemon to sleep in, and more.**
 
 ## Documentation
 
