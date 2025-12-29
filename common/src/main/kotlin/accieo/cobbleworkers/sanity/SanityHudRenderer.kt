@@ -129,14 +129,20 @@ object SanityHudRenderer {
     }
 
     private fun getStatusColor(status: String): Int {
+        val clean = status
+            .replace(Regex("§."), "")   // strip MC formatting if present
+            .lowercase()
+
         return when {
-            status.contains("Is fast asleep...") -> 0xFFFF5555.toInt() // Red
-            status.contains("Is slacking off!") -> 0xFFFF5555.toInt() // Red
-            status.contains("Is hard at work.") -> 0xFF55FFFF.toInt() // Cyan
-            status.contains("Is in good condition.") -> 0xFFFFAA00.toInt() // Orange
-            else -> 0xFFFFAA00.toInt() // Muted Gray
+            "fast asleep" in clean -> 0xFFFF5555.toInt()   // Red
+            "looking for a place to sleep" in clean -> 0xFFFF5555.toInt()  // Red
+            "slacking off" in clean -> 0xFFFF5555.toInt()  // Red
+            "hard at work" in clean -> 0xFF55FFFF.toInt()  // Cyan
+            "good condition" in clean -> 0xFFFFAA00.toInt()// Orange
+            else -> 0xFFFFAA00.toInt()
         }
     }
+
 
     private fun getSanityColor(sanity: Double): Int {
         return when {

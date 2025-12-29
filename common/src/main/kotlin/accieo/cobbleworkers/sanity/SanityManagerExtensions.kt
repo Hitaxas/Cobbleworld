@@ -32,8 +32,13 @@ object SanityManagerExtensions {
 
     fun getStatus(pokemon: Pokemon): String {
         val currentSanity = getSanity(pokemon)
+        val tag = pokemon.persistentData
+        val isRefusing = tag.getBoolean("cobbleworkers_refusing")
+        val isSleeping = tag.getBoolean("cobbleworkers_sleeping")
 
         return when {
+            isRefusing && isSleeping -> "Is fast asleep... (${currentSanity.toInt()}%)"
+            isRefusing -> "Is slacking off! (${currentSanity.toInt()}%)"
             currentSanity < SanityManager.REFUSE_THRESHOLD -> "Has just about had it... (${currentSanity.toInt()}%)"
             currentSanity < SanityManager.COMPLAINING_THRESHOLD -> "Unhappy with work conditions. (${currentSanity.toInt()}%)"
             currentSanity >= 80 -> "Is hard at work. (${currentSanity.toInt()}%)"

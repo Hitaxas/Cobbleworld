@@ -15,7 +15,7 @@ import com.cobblemon.mod.common.pokemon.Pokemon
 import com.cobblemon.mod.common.util.cobblemonResource
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.text.Text
-import net.minecraft.util.math.MathHelper
+import net.minecraft.util.Identifier
 import kotlin.math.roundToInt
 
 /**
@@ -27,7 +27,7 @@ class SanityFeatureRenderer(
     "sanity",
     Text.literal("Sanity"),
     cobblemonResource("textures/gui/summary/summary_stats_other_bar.png"),
-    cobblemonResource("textures/gui/summary/summary_stats_friendship_overlay.png"),
+    Identifier("cobbleworkers", "textures/gui/summary/summary_stats_sanity_overlay.png"),
     pokemon,
     0,
     100,

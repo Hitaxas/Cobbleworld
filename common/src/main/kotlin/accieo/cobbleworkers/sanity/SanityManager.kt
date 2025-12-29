@@ -77,10 +77,14 @@ object SanityManager {
 
     private fun persistSanity(pokemon: PokemonEntity, value: Double) {
         val clamped = value.coerceIn(0.0, MAX_SANITY)
-        sanity[pokemon.pokemon.uuid] = clamped
+        val uuid = pokemon.pokemon.uuid
+        sanity[uuid] = clamped
 
         try {
-            pokemon.pokemon.persistentData.putDouble("cobbleworkers_sanity", clamped)
+            val tag = pokemon.pokemon.persistentData
+            tag.putDouble("cobbleworkers_sanity", clamped)
+            tag.putBoolean("cobbleworkers_refusing", isRefusing[uuid] ?: false)
+            tag.putBoolean("cobbleworkers_sleeping", isSleeping[uuid] ?: false)
         } catch (_: Exception) {}
     }
 
@@ -122,6 +126,8 @@ object SanityManager {
                 breakStartTime.remove(uuid)
 
                 clearSleepPose(pokemon)
+
+                persistSanity(pokemon, currentSanity)
 
                 sendActionBar(
                     pokemon,
@@ -245,6 +251,7 @@ object SanityManager {
         } else {
             sendActionBar(pokemon, "$name is slacking off!", Formatting.RED)
         }
+            persistSanity(pokemon, getSanity(pokemon))
     }
 
     fun shouldUseBed(pokemon: PokemonEntity, world: World): Boolean {
