@@ -30,5 +30,6 @@ enum class JobType {
     Scout,
     TumblestoneHarvester,
     CauldronGenerator,
-    Generic
+    Generic,
+    TreeFeller
 }

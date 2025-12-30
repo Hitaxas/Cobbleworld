@@ -84,6 +84,9 @@ class CobbleworkersConfig : ConfigData {
     @ConfigEntry.Gui.CollapsibleObject
     var scouts = ScoutGroup()
 
+    @ConfigEntry.Gui.CollapsibleObject
+    var treefellers = TreeFellingGroup()
+
     class GeneralGroup {
         @ConfigEntry.BoundedDiscrete(min = 10, max = 30)
         var blocksScannedPerTick = 15
@@ -334,5 +337,14 @@ class CobbleworkersConfig : ConfigData {
 
         @ConfigEntry.Gui.EnumHandler(option = ConfigEntry.Gui.EnumHandler.EnumDisplayOption.DROPDOWN)
         var typeScouts: CobbleworkersConfigPokemonType = CobbleworkersConfigPokemonType.FLYING
+    }
+
+    class TreeFellingGroup {
+        var treeFellersEnabled = true
+        var treeFellers: MutableList<String> = mutableListOf("ditto")
+        val maxTreeSize: Int = 200
+
+        @ConfigEntry.Gui.EnumHandler(option = ConfigEntry.Gui.EnumHandler.EnumDisplayOption.DROPDOWN)
+        var typeFellsTrees: CobbleworkersConfigPokemonType = CobbleworkersConfigPokemonType.FIGHTING
     }
 }

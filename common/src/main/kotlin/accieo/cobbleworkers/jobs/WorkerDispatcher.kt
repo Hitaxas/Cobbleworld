@@ -49,7 +49,8 @@ object WorkerDispatcher {
         PickUpLooter,
         Scout,
         SnowGenerator,
-        TumblestoneHarvester
+        TumblestoneHarvester,
+        TreeFeller
     )
 
     /**
