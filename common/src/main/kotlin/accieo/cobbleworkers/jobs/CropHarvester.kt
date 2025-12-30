@@ -38,10 +38,8 @@ object CropHarvester : Worker {
     override val blockValidator: ((World, BlockPos) -> Boolean) = { world: World, pos: BlockPos ->
         val state = world.getBlockState(pos)
 
-        // Existing supported crops
         state.block in CobbleworkersCropUtils.validCropBlocks ||
 
-                // BYG BLUEBERRY SUPPORT
                 Registries.BLOCK.getId(state.block).toString() == "biomeswevegone:blueberry_bush"
     }
 
@@ -49,6 +47,11 @@ object CropHarvester : Worker {
         if (!config.cropHarvestersEnabled) return false
         return CobbleworkersTypeUtils.isAllowedByType(config.typeHarvestsCrops, pokemonEntity)
                 || isDesignatedHarvester(pokemonEntity)
+    }
+
+    private fun isLegendaryOrMythical(pokemonEntity: PokemonEntity): Boolean {
+        val labels = pokemonEntity.pokemon.species.labels
+        return labels.contains("legendary") || labels.contains("mythical")
     }
 
     override fun tick(world: World, origin: BlockPos, pokemonEntity: PokemonEntity) {
@@ -77,6 +80,7 @@ object CropHarvester : Worker {
     private fun handleHarvesting(world: World, origin: BlockPos, pokemonEntity: PokemonEntity) {
         val pokemonId = pokemonEntity.pokemon.uuid
         val breakingPos = pokemonBreakingBlocks[pokemonId]
+        val isLegendary = isLegendaryOrMythical(pokemonEntity)
 
         if (breakingPos != null) {
             val blockState = world.getBlockState(breakingPos)
@@ -102,6 +106,12 @@ object CropHarvester : Worker {
                 heldItemsByPokemon,
                 config
             )
+
+            if (isLegendary && heldItemsByPokemon.containsKey(pokemonId)) {
+                val currentItems = heldItemsByPokemon[pokemonId]!!
+                val doubledItems = doubleItemStacks(currentItems)
+                heldItemsByPokemon[pokemonId] = doubledItems
+            }
 
             if (heldItemsByPokemon.containsKey(pokemonId)) {
                 pokemonBreakingBlocks.remove(pokemonId)
@@ -140,6 +150,12 @@ object CropHarvester : Worker {
                 config
             )
 
+            if (isLegendary && heldItemsByPokemon.containsKey(pokemonId)) {
+                val currentItems = heldItemsByPokemon[pokemonId]!!
+                val doubledItems = doubleItemStacks(currentItems)
+                heldItemsByPokemon[pokemonId] = doubledItems
+            }
+
             if (
                 !CobbleworkersCropUtils.requiresBreaking(blockState.block) &&
                 heldItemsByPokemon.containsKey(pokemonId)
@@ -151,6 +167,32 @@ object CropHarvester : Worker {
         }
     }
 
+    private fun doubleItemStacks(items: List<ItemStack>): List<ItemStack> {
+        val result = mutableListOf<ItemStack>()
+
+        for (stack in items) {
+            val totalCount = stack.count * 2
+            val maxStackSize = stack.maxCount
+
+            if (totalCount <= maxStackSize) {
+                val doubled = stack.copy()
+                doubled.count = totalCount
+                result.add(doubled)
+            } else {
+                var remaining = totalCount
+                while (remaining > 0) {
+                    val stackCount = remaining.coerceAtMost(maxStackSize)
+                    val newStack = stack.copy()
+                    newStack.count = stackCount
+                    result.add(newStack)
+                    remaining -= stackCount
+                }
+            }
+        }
+
+        return result
+    }
+
     /**
      * Checks if the Pokémon qualifies as a harvester because its species is
      * explicitly listed in the config.
@@ -160,34 +202,31 @@ object CropHarvester : Worker {
         return config.cropHarvesters.any { it.lowercase() == speciesName }
     }
 
-
     override fun isActivelyWorking(pokemonEntity: PokemonEntity): Boolean {
         val uuid = pokemonEntity.pokemon.uuid
         val world = pokemonEntity.world
 
-        // If currently breaking a crop → working
         if (pokemonBreakingBlocks.containsKey(uuid)) return true
 
-        // If holding harvested items → still working (depositing phase)
         if (heldItemsByPokemon[uuid]?.isNotEmpty() == true) return true
 
-        // If Pokémon currently has a navigation target → actively harvesting
         val target = CobbleworkersNavigationUtils.getTarget(uuid, world)
         if (target != null) return true
 
-        // If refusing / on break → NOT working
         if (accieo.cobbleworkers.sanity.SanityManager.isRefusingWork(pokemonEntity))
             return false
 
-        // If sleeping during break → NOT working
         if (accieo.cobbleworkers.sanity.SanityManager.isSleepingDuringBreak(pokemonEntity))
             return false
 
-        // Otherwise:
-        // Pokémon is “on duty” (able to harvest, may be scanning / idle waiting)
-        // Count as working so sanity drains
         return true
     }
 
-  
+    override fun interrupt(pokemonEntity: PokemonEntity, world: World) {
+        val uuid = pokemonEntity.pokemon.uuid
+        heldItemsByPokemon.remove(uuid)
+        failedDepositLocations.remove(uuid)
+        pokemonBreakingBlocks.remove(uuid)
+        CobbleworkersNavigationUtils.releaseTarget(uuid, world)
+    }
 }
