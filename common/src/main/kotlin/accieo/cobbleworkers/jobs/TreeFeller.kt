@@ -60,6 +60,11 @@ object TreeFeller : Worker {
                 isDesignatedFeller(pokemonEntity)
     }
 
+    private fun isLegendaryOrMythical(pokemonEntity: PokemonEntity): Boolean {
+        val labels = pokemonEntity.pokemon.species.labels
+        return labels.contains("legendary") || labels.contains("mythical")
+    }
+
     override fun tick(world: World, origin: BlockPos, pokemonEntity: PokemonEntity) {
         val pokemonId = pokemonEntity.pokemon.uuid
         val heldItems = heldItemsByPokemon[pokemonId] ?: emptyList()
@@ -75,6 +80,8 @@ object TreeFeller : Worker {
     private fun handleTreeFelling(world: World, origin: BlockPos, pokemonEntity: PokemonEntity) {
         val pokemonId = pokemonEntity.pokemon.uuid
         val fellingState = pokemonFellingTrees[pokemonId]
+        val isLegendary = isLegendaryOrMythical(pokemonEntity)
+        val requiredTicks = if (isLegendary) REQUIRED_CHOP_TICKS / 2 else REQUIRED_CHOP_TICKS
 
         if (fellingState != null) {
             if (!CobbleworkersNavigationUtils.isPokemonAtPosition(pokemonEntity, fellingState.treeBase, 3.5)) {
@@ -97,7 +104,7 @@ object TreeFeller : Worker {
                 spawnChopEffects(world, fellingState.treeBase)
             }
 
-            if (fellingState.chopProgress >= REQUIRED_CHOP_TICKS) {
+            if (fellingState.chopProgress >= requiredTicks) {
                 fellingState.blocksToChop.forEach { pos ->
                     if (!world.getBlockState(pos).isAir) {
                         collectAndBreak(world, pos, pokemonEntity)
