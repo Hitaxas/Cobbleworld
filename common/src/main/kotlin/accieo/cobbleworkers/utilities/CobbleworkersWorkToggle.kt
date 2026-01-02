@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 HitaxasTV
+ * Copyright (C) 2026 HitaxasTV
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -18,7 +18,7 @@ object CobbleworkersWorkToggle {
     fun canWork(pokemon: Pokemon): Boolean {
         return pokemon.persistentData.getBoolean(WORK_ENABLED_KEY).takeIf { 
             pokemon.persistentData.contains(WORK_ENABLED_KEY) 
-        } ?: true // Default to true (can work)
+        } ?: false // Default to false (can't work)
     }
 
     @JvmStatic
