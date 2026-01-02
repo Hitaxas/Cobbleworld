@@ -40,6 +40,10 @@ object DiveLooter : Worker {
      * NOTE: This is used to prevent running the tick method unnecessarily.
      */
     override fun shouldRun(pokemonEntity: PokemonEntity): Boolean {
+        if (!accieo.cobbleworkers.utilities.CobbleworkersWorkToggle.canWork(pokemonEntity.pokemon)) {
+            return false
+        }
+
         if (!config.divingLootersEnabled) return false
 
         return pokemonEntity.pokemon.moveSet.getMoves().any { it.name == "dive" }

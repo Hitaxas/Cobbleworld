@@ -57,6 +57,10 @@ object Archeologist : Worker {
      * NOTE: This is used to prevent running the tick method unnecessarily.
      */
     override fun shouldRun(pokemonEntity: PokemonEntity): Boolean {
+        if (!accieo.cobbleworkers.utilities.CobbleworkersWorkToggle.canWork(pokemonEntity.pokemon)) {
+            return false
+        }
+
         if (!config.archeologistsEnabled) return false
 
         return  CobbleworkersTypeUtils.isAllowedByType(config.typeDoesArcheology, pokemonEntity) || isDesignatedHarvester(pokemonEntity)

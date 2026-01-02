@@ -57,6 +57,10 @@ object HoneyCollector : Worker {
      * NOTE: This is used to prevent running the tick method unnecessarily.
      */
     override fun shouldRun(pokemonEntity: PokemonEntity): Boolean {
+        if (!accieo.cobbleworkers.utilities.CobbleworkersWorkToggle.canWork(pokemonEntity.pokemon)) {
+            return false
+        }
+
         if (!config.honeyCollectorsEnabled) return false
 
         return isAllowedBySpecies(pokemonEntity) || isDesignatedCollector(pokemonEntity) || CobbleworkersTypeUtils.isAllowedByType(config.typeHarvestsHoney, pokemonEntity)

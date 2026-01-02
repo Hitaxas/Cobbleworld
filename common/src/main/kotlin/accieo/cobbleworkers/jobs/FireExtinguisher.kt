@@ -34,6 +34,10 @@ object FireExtinguisher : Worker {
      * NOTE: This is used to prevent running the tick method unnecessarily.
      */
     override fun shouldRun(pokemonEntity: PokemonEntity): Boolean {
+        if (!accieo.cobbleworkers.utilities.CobbleworkersWorkToggle.canWork(pokemonEntity.pokemon)) {
+            return false
+        }
+
         if (!config.extinguishersEnabled) return false
 
         return CobbleworkersTypeUtils.isAllowedByType(config.typeExtinguishesFire, pokemonEntity) || isDesignatedExtinguisher(pokemonEntity)

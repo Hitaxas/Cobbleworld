@@ -47,6 +47,10 @@ object Electrician : Worker {
     }
 
     override fun shouldRun(pokemonEntity: PokemonEntity): Boolean {
+        if (!accieo.cobbleworkers.utilities.CobbleworkersWorkToggle.canWork(pokemonEntity.pokemon)) {
+            return false
+        }
+
         if (!config.electriciansEnabled) return false
         return CobbleworkersTypeUtils.isAllowedByType(config.typePowersOvens, pokemonEntity) ||
                 isDesignatedElectrician(pokemonEntity)

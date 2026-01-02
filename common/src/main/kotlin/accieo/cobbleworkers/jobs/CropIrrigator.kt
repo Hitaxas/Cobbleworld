@@ -46,6 +46,10 @@ object CropIrrigator : Worker {
     }
 
     override fun shouldRun(pokemon: PokemonEntity): Boolean {
+        if (!accieo.cobbleworkers.utilities.CobbleworkersWorkToggle.canWork(pokemon.pokemon)) {
+            return false
+        }
+
         if (!config.cropIrrigatorsEnabled) return false
         return CobbleworkersTypeUtils.isAllowedByType(config.typeIrrigatesCrops, pokemon) ||
                 config.cropIrrigators.any {

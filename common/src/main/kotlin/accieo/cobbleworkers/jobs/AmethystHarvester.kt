@@ -46,6 +46,10 @@ object AmethystHarvester : Worker {
      * NOTE: This is used to prevent running the tick method unnecessarily.
      */
     override fun shouldRun(pokemonEntity: PokemonEntity): Boolean {
+        if (!accieo.cobbleworkers.utilities.CobbleworkersWorkToggle.canWork(pokemonEntity.pokemon)) {
+            return false
+        }
+
         if (!config.amethystHarvestersEnabled) return false
 
         return CobbleworkersTypeUtils.isAllowedByType(config.typeHarvestsAmethyst, pokemonEntity) || isDesignatedHarvester(pokemonEntity)
