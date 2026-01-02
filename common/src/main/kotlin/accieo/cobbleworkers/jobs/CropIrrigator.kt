@@ -236,7 +236,7 @@ object CropIrrigator : Worker {
 
     override fun isActivelyWorking(pokemon: PokemonEntity): Boolean {
         val state = states[pokemon.pokemon.uuid] ?: return false
-        return state.isIrrigating
+        return state.isIrrigating || state.activeCenter != null
     }
 
     override fun interrupt(pokemon: PokemonEntity, world: World) {
