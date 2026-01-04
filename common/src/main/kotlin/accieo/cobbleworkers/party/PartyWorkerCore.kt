@@ -22,7 +22,7 @@ import net.minecraft.util.math.Box
 
 object PartyWorkerCore {
 
-    public val activePartyPokemon = ConcurrentHashMap.newKeySet<UUID>()
+    val activePartyPokemon = ConcurrentHashMap.newKeySet<UUID>()
     private val pokemonWorkOrigin = ConcurrentHashMap<UUID, BlockPos>()
 
     fun markActive(pokemon: PokemonEntity) {
@@ -32,7 +32,6 @@ object PartyWorkerCore {
         val origin = BlockPos.ofFloored(pokemon.x, pokemon.y, pokemon.z)
         pokemonWorkOrigin.putIfAbsent(uuid, origin)
 
-        // 🚀 Instant world awareness
         if (!pokemon.world.isClient) {
             forceImmediateScan(pokemon.world, origin)
         }
@@ -44,7 +43,6 @@ object PartyWorkerCore {
         activePartyPokemon.remove(uuid)
         pokemonWorkOrigin.remove(uuid)
 
-        // 🚨 NEW: force release from any job
         WorkerDispatcher.releasePokemonFromJobs(pokemon)
 
         accieo.cobbleworkers.sanity.SanityManager.recoverWhileIdle(pokemon)
@@ -67,7 +65,6 @@ object PartyWorkerCore {
         val workOrigin = pokemonWorkOrigin[uuid]
             ?: BlockPos.ofFloored(pokemon.x, pokemon.y, pokemon.z)
 
-        // Then tick the pokemon's work logic
         WorkerDispatcher.tickPokemon(world, workOrigin, pokemon)
     }
 

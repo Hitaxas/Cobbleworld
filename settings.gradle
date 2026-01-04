@@ -7,7 +7,7 @@ pluginManagement {
     }
 }
 
-rootProject.name = 'cobbleworkers'
+rootProject.name = 'cobbleworld'
 
 include 'common'
 include 'fabric'
