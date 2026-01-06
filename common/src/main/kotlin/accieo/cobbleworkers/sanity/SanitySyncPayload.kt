@@ -9,6 +9,7 @@
 package accieo.cobbleworkers.sanity
 
 import io.netty.buffer.ByteBuf
+import net.minecraft.network.RegistryByteBuf
 import net.minecraft.network.codec.PacketCodec
 import net.minecraft.network.codec.PacketCodecs
 import net.minecraft.network.packet.CustomPayload
@@ -17,46 +18,47 @@ import java.util.UUID
 
 data class SanitySyncPayload(val entries: List<SanityEntry>) : CustomPayload {
 
-    override fun getId(): CustomPayload.Id<out CustomPayload> = ID
+    override fun getId(): CustomPayload.Id<SanitySyncPayload> = ID
 
     companion object {
-        val ID: CustomPayload.Id<SanitySyncPayload> =
-            CustomPayload.Id(Identifier.of("cobbleworkers", "sanity_sync"))
-
-        private val UUID_CODEC: PacketCodec<ByteBuf, UUID> = PacketCodec.of(
-            { uuid, buf ->
-                buf.writeLong(uuid.mostSignificantBits)
-                buf.writeLong(uuid.leastSignificantBits)
-            },
-            { buf ->
-                UUID(buf.readLong(), buf.readLong())
-            }
+        val ID = CustomPayload.Id<SanitySyncPayload>(
+            Identifier.of("cobbleworkers", "sanity_sync")
         )
 
-        val CODEC: PacketCodec<ByteBuf, SanitySyncPayload> = PacketCodec.of(
-            { value, buf ->
-                // Write
-                PacketCodecs.VAR_INT.encode(buf, value.entries.size)
-                value.entries.forEach { entry ->
-                    UUID_CODEC.encode(buf, entry.uuid)
-                    PacketCodecs.STRING.encode(buf, entry.name)
-                    PacketCodecs.VAR_INT.encode(buf, entry.sanity)
-                    PacketCodecs.STRING.encode(buf, entry.status)
+        private val UUID_CODEC: PacketCodec<RegistryByteBuf, UUID> =
+            PacketCodec.of(
+                { uuid, buf ->
+                    buf.writeLong(uuid.mostSignificantBits)
+                    buf.writeLong(uuid.leastSignificantBits)
+                },
+                { buf ->
+                    UUID(buf.readLong(), buf.readLong())
                 }
-            },
-            { buf ->
-                // Read
-                val size = PacketCodecs.VAR_INT.decode(buf)
-                val entries = mutableListOf<SanityEntry>()
-                repeat(size) {
-                    val uuid = UUID_CODEC.decode(buf)
-                    val name = PacketCodecs.STRING.decode(buf)
-                    val sanity = PacketCodecs.VAR_INT.decode(buf)
-                    val status = PacketCodecs.STRING.decode(buf)
-                    entries.add(SanityEntry(uuid, name, sanity, status))
+            )
+
+        val CODEC: PacketCodec<RegistryByteBuf, SanitySyncPayload> =
+            PacketCodec.of(
+                { value, buf ->
+                    PacketCodecs.VAR_INT.encode(buf, value.entries.size)
+                    value.entries.forEach { entry ->
+                        UUID_CODEC.encode(buf, entry.uuid)
+                        PacketCodecs.STRING.encode(buf, entry.name)
+                        PacketCodecs.VAR_INT.encode(buf, entry.sanity)
+                        PacketCodecs.STRING.encode(buf, entry.status)
+                    }
+                },
+                { buf ->
+                    val size = PacketCodecs.VAR_INT.decode(buf)
+                    val entries = MutableList(size) {
+                        SanityEntry(
+                            UUID_CODEC.decode(buf),
+                            PacketCodecs.STRING.decode(buf),
+                            PacketCodecs.VAR_INT.decode(buf),
+                            PacketCodecs.STRING.decode(buf)
+                        )
+                    }
+                    SanitySyncPayload(entries)
                 }
-                SanitySyncPayload(entries)
-            }
-        )
+            )
     }
 }

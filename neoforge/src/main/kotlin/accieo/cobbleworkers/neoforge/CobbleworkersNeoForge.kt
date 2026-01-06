@@ -9,6 +9,7 @@
 package accieo.cobbleworkers.neoforge
 
 import accieo.cobbleworkers.Cobbleworkers
+import accieo.cobbleworkers.registry.CobbleworkersBlocks
 import accieo.cobbleworkers.integration.CobbleworkersIntegrationHandler
 import accieo.cobbleworkers.neoforge.integration.NeoForgeIntegrationHelper
 import accieo.cobbleworkers.sanity.SanityPlatformNetworkingInstance
@@ -25,6 +26,12 @@ import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.fml.common.EventBusSubscriber
 import net.minecraft.server.world.ServerWorld
 import thedarkcolour.kotlinforforge.neoforge.forge.MOD_BUS
+import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent
+import net.minecraft.item.ItemGroups
+import net.minecraft.item.ItemGroup
+import accieo.cobbleworkers.commands.CobbleworkersCommands
+import net.neoforged.neoforge.event.RegisterCommandsEvent
+
 
 @Mod(Cobbleworkers.MODID)
 object CobbleworkersNeoForge {
@@ -32,14 +39,22 @@ object CobbleworkersNeoForge {
         SanityPlatformNetworkingInstance = NeoForgeSanityNetworking
 
         Cobbleworkers.init()
+        CobbleworkersBlocks.register()
 
         MOD_BUS.addListener(::onCommonSetup)
         MOD_BUS.addListener(::onRegisterPayloads)
+        MOD_BUS.addListener(::onBuildCreativeTabs) // Add this line
     }
 
     private fun onCommonSetup(event: FMLCommonSetupEvent) {
         val integrationHandler = CobbleworkersIntegrationHandler(NeoForgeIntegrationHelper)
         integrationHandler.addIntegrations()
+    }
+
+    private fun onBuildCreativeTabs(event: BuildCreativeModeTabContentsEvent) {
+        if (event.tabKey == ItemGroups.FUNCTIONAL) {
+            (event as ItemGroup.Entries).add(CobbleworkersBlocks.POKEBED_ITEM)
+        }
     }
 
     private fun onRegisterPayloads(event: RegisterPayloadHandlersEvent) {
@@ -65,5 +80,10 @@ object SanityTickHandler {
         if (world is ServerWorld && !world.isClient) {
             SanitySyncTicker.tick(world)
         }
+    }
+
+    @SubscribeEvent
+    fun onRegisterCommands(event: RegisterCommandsEvent) {
+        CobbleworkersCommands.register(event.dispatcher)
     }
 }

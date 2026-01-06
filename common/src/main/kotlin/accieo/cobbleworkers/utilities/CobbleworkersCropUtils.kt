@@ -60,13 +60,38 @@ object CobbleworkersCropUtils {
 
     fun addCompatibility(externalBlocks: Set<Block>) = validCropBlocks.addAll(externalBlocks)
 
-    fun isCroptopia(block: Block): Boolean = Registries.BLOCK.getId(block).namespace == "croptopia"
+    fun isFarmersDelight(block: Block): Boolean {
+        val id = Registries.BLOCK.getId(block)
+        if (id.namespace != "farmersdelight") return false
+
+        return id.path in FarmersDelightBlocks.ALL
+    }
+
+    fun isCroptopia(block: Block): Boolean {
+        val id = Registries.BLOCK.getId(block)
+        if (id.namespace != "croptopia") return false
+
+        // Check if it's one of the defined Croptopia crops
+        return CroptopiaBlocks.CROPS.any { cropName -> id.path.contains(cropName) }
+    }
 
     fun isBiomesWeveGone(block: Block): Boolean = Registries.BLOCK.getId(block).namespace == "biomeswevegone"
 
     fun isHarvestable(state: BlockState): Boolean {
         val block = state.block
-        return block in validCropBlocks || isCroptopia(block) || isBiomesWeveGone(block) || block is CropBlock
+
+        return when {
+            // Explicit mod checks
+            isCroptopia(block) -> true
+            isFarmersDelight(block) -> true
+            isBiomesWeveGone(block) -> true
+
+            // Vanilla and registered crops
+            block in validCropBlocks -> true
+            block is CropBlock -> true
+
+            else -> false
+        }
     }
 
     fun findAvailableCrop(world: World, origin: BlockPos): BlockPos? {

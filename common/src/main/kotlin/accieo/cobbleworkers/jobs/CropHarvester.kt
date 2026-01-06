@@ -37,10 +37,7 @@ object CropHarvester : Worker {
 
     override val blockValidator: ((World, BlockPos) -> Boolean) = { world: World, pos: BlockPos ->
         val state = world.getBlockState(pos)
-
-        state.block in CobbleworkersCropUtils.validCropBlocks ||
-
-                Registries.BLOCK.getId(state.block).toString() == "biomeswevegone:blueberry_bush"
+        CobbleworkersCropUtils.isHarvestable(state)
     }
 
     override fun shouldRun(pokemonEntity: PokemonEntity): Boolean {
