@@ -21,6 +21,7 @@ import accieo.cobbleworkers.network.fabric.FabricSanityNetworking
 import accieo.cobbleworkers.network.payloads.ToggleWorkPayload
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.MinecraftClient
+import net.minecraft.util.Identifier
 
 object CobbleworkersFabricClient : ClientModInitializer {
     override fun onInitializeClient() {
@@ -54,13 +55,14 @@ object CobbleworkersFabricClient : ClientModInitializer {
                 .firstOrNull { it.uuid == event.pokemonID }
 
             if (entity is com.cobblemon.mod.common.entity.pokemon.PokemonEntity) {
-                val canWork = CobbleworkersWorkToggle.canWork(entity.pokemon)
+                val pokemon = entity.pokemon
+                val canWork = CobbleworkersWorkToggle.canWork(pokemon)
 
                 val workToggle = InteractWheelOption(
                     iconResource = if (canWork) {
-                        cobblemonResource("textures/gui/interact/interact_wheel_icon_cancel.png")
+                        Identifier("cobbleworkers","textures/gui/interact/interact_wheel_icon_work2.png")
                     } else {
-                        cobblemonResource("textures/gui/interact/interact_wheel_icon_check.png")
+                        Identifier("cobbleworkers","textures/gui/interact/interact_wheel_icon_work1.png")
                     },
                     tooltipText = if (canWork) {
                         "cobbleworkers.ui.interact.disable_work"
@@ -72,6 +74,7 @@ object CobbleworkersFabricClient : ClientModInitializer {
                         ClientPlayNetworking.send(
                             ToggleWorkPayload(entity.uuid)
                         )
+                        CobbleworkersWorkToggle.setCanWork(pokemon, !canWork)
                         client.setScreen(null)
                     }
                 )

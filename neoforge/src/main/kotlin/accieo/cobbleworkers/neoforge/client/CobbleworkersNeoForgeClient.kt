@@ -15,6 +15,7 @@ import com.cobblemon.mod.common.api.events.CobblemonEvents
 import com.cobblemon.mod.common.client.gui.interact.wheel.InteractWheelOption
 import com.cobblemon.mod.common.util.cobblemonResource
 import net.minecraft.client.MinecraftClient
+import net.minecraft.util.Identifier
 import net.neoforged.api.distmarker.Dist
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.fml.common.EventBusSubscriber
@@ -50,9 +51,9 @@ object CobbleworkersNeoForgeClientSetup {
 
                 val workToggle = InteractWheelOption(
                     iconResource = if (canWork) {
-                        cobblemonResource("textures/gui/interact/interact_wheel_icon_cancel.png")
+                        Identifier.of("cobbleworkers","textures/gui/interact/interact_wheel_icon_work2.png")
                     } else {
-                        cobblemonResource("textures/gui/interact/interact_wheel_icon_check.png")
+                        Identifier.of("cobbleworkers","textures/gui/interact/interact_wheel_icon_work1.png")
                     },
                     tooltipText = if (canWork) {
                         "cobbleworkers.ui.interact.disable_work"
