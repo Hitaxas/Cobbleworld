@@ -9,6 +9,8 @@
 package accieo.cobbleworkers.network.fabric
 
 import accieo.cobbleworkers.network.payloads.ToggleWorkPayload
+import accieo.cobbleworkers.network.payloads.RequestWorkStatePayload
+import accieo.cobbleworkers.network.payloads.SyncWorkStatePayload
 import accieo.cobbleworkers.sanity.SanitySyncPayload
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 
@@ -26,10 +28,20 @@ object CobbleworkersFabricPackets {
             ToggleWorkPayload.CODEC
         )
 
+        PayloadTypeRegistry.playC2S().register(
+            RequestWorkStatePayload.ID,
+            RequestWorkStatePayload.CODEC
+        )
+
         // Server → Client
         PayloadTypeRegistry.playS2C().register(
             SanitySyncPayload.ID,
             SanitySyncPayload.CODEC
+        )
+
+        PayloadTypeRegistry.playS2C().register(
+            SyncWorkStatePayload.ID,
+            SyncWorkStatePayload.CODEC
         )
     }
 }

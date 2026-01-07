@@ -11,19 +11,24 @@ package accieo.cobbleworkers.fabric.client
 import accieo.cobbleworkers.sanity.SanityFeatureRegistration
 import accieo.cobbleworkers.sanity.SanityHudRenderer
 import accieo.cobbleworkers.utilities.CobbleworkersWorkToggle
+import accieo.cobbleworkers.network.payloads.ToggleWorkPayload
+import accieo.cobbleworkers.network.payloads.RequestWorkStatePayload
+import accieo.cobbleworkers.network.payloads.SyncWorkStatePayload
 import com.cobblemon.mod.common.api.events.CobblemonEvents
 import com.cobblemon.mod.common.client.gui.interact.wheel.InteractWheelOption
-import com.cobblemon.mod.common.util.cobblemonResource
 import net.fabricmc.api.ClientModInitializer
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents
 import accieo.cobbleworkers.network.fabric.FabricSanityNetworking
-import accieo.cobbleworkers.network.payloads.ToggleWorkPayload
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.MinecraftClient
 import net.minecraft.util.Identifier
 
 object CobbleworkersFabricClient : ClientModInitializer {
+
+    // Cache for work states received from server
+    private val workStateCache = mutableMapOf<java.util.UUID, Boolean>()
+
     override fun onInitializeClient() {
         FabricSanityNetworking.registerClientHandlers()
 
@@ -42,6 +47,21 @@ object CobbleworkersFabricClient : ClientModInitializer {
             }
         }
 
+        // Register work state sync handler
+        ClientPlayNetworking.registerGlobalReceiver(SyncWorkStatePayload.ID) { payload, context ->
+            context.client().execute {
+                // Cache the work state from server
+                workStateCache[payload.pokemonId] = payload.canWork
+
+                // Also update the client-side Pokemon if available
+                val world = context.client().world
+                val entity = world?.getEntityById(payload.pokemonId.hashCode()) // This might not work reliably
+                if (entity is com.cobblemon.mod.common.entity.pokemon.PokemonEntity) {
+                    CobbleworkersWorkToggle.setCanWork(entity.pokemon, payload.canWork)
+                }
+            }
+        }
+
         // Register work toggle interact wheel option
         registerWorkToggleInteraction()
     }
@@ -56,13 +76,18 @@ object CobbleworkersFabricClient : ClientModInitializer {
 
             if (entity is com.cobblemon.mod.common.entity.pokemon.PokemonEntity) {
                 val pokemon = entity.pokemon
-                val canWork = CobbleworkersWorkToggle.canWork(pokemon)
+
+                // Request the current work state from server
+                ClientPlayNetworking.send(RequestWorkStatePayload(event.pokemonID))
+
+                // Use cached state if available, otherwise use client-side state
+                val canWork = workStateCache[event.pokemonID] ?: CobbleworkersWorkToggle.canWork(pokemon)
 
                 val workToggle = InteractWheelOption(
                     iconResource = if (canWork) {
-                        Identifier("cobbleworkers","textures/gui/interact/interact_wheel_icon_work2.png")
+                        Identifier.of("cobbleworkers","textures/gui/interact/interact_wheel_icon_work2.png")
                     } else {
-                        Identifier("cobbleworkers","textures/gui/interact/interact_wheel_icon_work1.png")
+                        Identifier.of("cobbleworkers","textures/gui/interact/interact_wheel_icon_work1.png")
                     },
                     tooltipText = if (canWork) {
                         "cobbleworkers.ui.interact.disable_work"
@@ -71,9 +96,9 @@ object CobbleworkersFabricClient : ClientModInitializer {
                     },
                     enabled = true,
                     onPress = {
-                        ClientPlayNetworking.send(
-                            ToggleWorkPayload(entity.uuid)
-                        )
+                        ClientPlayNetworking.send(ToggleWorkPayload(entity.uuid))
+                        // Update cache optimistically
+                        workStateCache[entity.uuid] = !canWork
                         CobbleworkersWorkToggle.setCanWork(pokemon, !canWork)
                         client.setScreen(null)
                     }
@@ -83,5 +108,4 @@ object CobbleworkersFabricClient : ClientModInitializer {
             }
         }
     }
-
 }

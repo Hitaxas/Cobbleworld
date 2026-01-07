@@ -8,6 +8,7 @@
 
 package accieo.cobbleworkers.neoforge.client
 
+import accieo.cobbleworkers.network.neoforge.NeoForgeWorkToggleNetworking
 import accieo.cobbleworkers.sanity.SanityHudRenderer
 import accieo.cobbleworkers.sanity.SanityFeatureRegistration
 import accieo.cobbleworkers.utilities.CobbleworkersWorkToggle
@@ -46,6 +47,7 @@ object CobbleworkersNeoForgeClientSetup {
                 .firstOrNull { it.uuid == event.pokemonID }
 
             if (entity is com.cobblemon.mod.common.entity.pokemon.PokemonEntity) {
+                NeoForgeWorkToggleNetworking.requestState(entity.uuid)
                 val pokemon = entity.pokemon
                 val canWork = CobbleworkersWorkToggle.canWork(pokemon)
 
