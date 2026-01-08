@@ -12,9 +12,9 @@ import accieo.cobbleworkers.network.neoforge.NeoForgeWorkToggleNetworking
 import accieo.cobbleworkers.sanity.SanityHudRenderer
 import accieo.cobbleworkers.sanity.SanityFeatureRegistration
 import accieo.cobbleworkers.utilities.CobbleworkersWorkToggle
+import accieo.cobbleworkers.utilities.ClientWorkStateCache
 import com.cobblemon.mod.common.api.events.CobblemonEvents
 import com.cobblemon.mod.common.client.gui.interact.wheel.InteractWheelOption
-import com.cobblemon.mod.common.util.cobblemonResource
 import net.minecraft.client.MinecraftClient
 import net.minecraft.util.Identifier
 import net.neoforged.api.distmarker.Dist
@@ -23,6 +23,7 @@ import net.neoforged.fml.common.EventBusSubscriber
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent
 import net.neoforged.neoforge.client.event.RenderGuiEvent
 import net.neoforged.neoforge.client.event.ScreenEvent
+import net.neoforged.neoforge.event.level.LevelEvent
 
 @EventBusSubscriber(value = [Dist.CLIENT], bus = EventBusSubscriber.Bus.MOD)
 object CobbleworkersNeoForgeClientSetup {
@@ -30,10 +31,8 @@ object CobbleworkersNeoForgeClientSetup {
     @SubscribeEvent
     fun onClientSetup(event: FMLClientSetupEvent) {
         event.enqueueWork {
-            // Register sanity feature renderer
             SanityFeatureRegistration.register()
 
-            // Register work toggle interact wheel option
             registerWorkToggleInteraction()
         }
     }
@@ -47,9 +46,12 @@ object CobbleworkersNeoForgeClientSetup {
                 .firstOrNull { it.uuid == event.pokemonID }
 
             if (entity is com.cobblemon.mod.common.entity.pokemon.PokemonEntity) {
-                NeoForgeWorkToggleNetworking.requestState(entity.uuid)
                 val pokemon = entity.pokemon
-                val canWork = CobbleworkersWorkToggle.canWork(pokemon)
+
+                NeoForgeWorkToggleNetworking.requestState(entity.uuid)
+
+                val canWork = ClientWorkStateCache.getState(entity.uuid)
+                    ?: CobbleworkersWorkToggle.canWork(pokemon)
 
                 val workToggle = InteractWheelOption(
                     iconResource = if (canWork) {
@@ -64,8 +66,7 @@ object CobbleworkersNeoForgeClientSetup {
                     },
                     enabled = true,
                     onPress = {
-                        accieo.cobbleworkers.network.neoforge.NeoForgeWorkToggleNetworking.sendToggle(entity.uuid)
-                        CobbleworkersWorkToggle.setCanWork(pokemon, !canWork)
+                        NeoForgeWorkToggleNetworking.sendToggle(entity.uuid)
                         client.setScreen(null)
                     }
                 )
@@ -81,13 +82,18 @@ object CobbleworkersNeoForgeClient {
 
     @SubscribeEvent
     fun onRenderOverlay(event: RenderGuiEvent.Post) {
-        // Render the HUD overlay for workers panel
         SanityHudRenderer.render(event.guiGraphics)
     }
 
     @SubscribeEvent
     fun onScreenRender(event: ScreenEvent.Render.Post) {
-        // Render sanity bar on Summary screens
         SanityFeatureRegistration.renderOnSummary(event.guiGraphics, event.screen)
+    }
+
+    @SubscribeEvent
+    fun onWorldUnload(event: LevelEvent.Unload) {
+        if (event.level.isClient) {
+            ClientWorkStateCache.clear()
+        }
     }
 }

@@ -14,6 +14,7 @@ import accieo.cobbleworkers.network.payloads.SyncWorkStatePayload
 import accieo.cobbleworkers.utilities.CobbleworkersWorkToggle
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents
 
 object FabricWorkToggleNetworking {
 
@@ -61,6 +62,18 @@ object FabricWorkToggleNetworking {
                     player,
                     SyncWorkStatePayload(payload.pokemonId, canWork)
                 )
+            }
+        }
+
+        ServerEntityEvents.ENTITY_LOAD.register { entity, world ->
+            if (!world.isClient && entity is PokemonEntity) {
+                val canWork = CobbleworkersWorkToggle.canWork(entity.pokemon)
+                world.server?.playerManager?.playerList?.forEach { player ->
+                    ServerPlayNetworking.send(
+                        player,
+                        SyncWorkStatePayload(entity.uuid, canWork)
+                    )
+                }
             }
         }
     }
